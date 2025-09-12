@@ -14,8 +14,8 @@ alias ClearFn = fn void(Window, Colour);
 alias DrawRectFn = fn void(Window, uint, uint, uint, uint, Colour, bool);*/
 interface WindowSystem
 {
-	fn void? init();
-	fn void quit();
+	// fn void? init();
+	// fn void quit();
 	fn Window? create_window(uint width, uint height, String title);
 	fn void destroy_window(Window window);
 	fn Event? get_event(Window window, Duration timeout = time::sec(0));
@@ -106,7 +106,9 @@ fn float PropVal.as_float(&self) => self.float_;
 
 fn void set_window_system(WindowSystem window_system)
 {
+	// if (current_window_system.ptr != null) current_window_system.quit();
 	current_window_system = window_system;
+	// current_window_system.init()!;
 }
 
 faultdef INIT_FAILED, CREATION_FAILED, NO_EVENT;
@@ -160,14 +162,14 @@ struct SDLWindowSystemWindow
 	uint delay_ms;
 }
 
-fn void? SDLWindowSystem.init(&self) @dynamic
+fn void? SDLWindowSystem.init(&self, Allocator alloc = mem)
 {
 	if (sdl::init(sdl::INIT_EVERYTHING) < 0) return INIT_FAILED?;
 	const DEFAULT_WINDOWS_CAPACITY = 3;
-	self.windows.init(mem, DEFAULT_WINDOWS_CAPACITY);
-	self.used_windows.init(mem, DEFAULT_WINDOWS_CAPACITY);
+	self.windows.init(alloc, DEFAULT_WINDOWS_CAPACITY);
+	self.used_windows.init(alloc, DEFAULT_WINDOWS_CAPACITY);
 }
-fn void SDLWindowSystem.quit(&self) @dynamic
+fn void SDLWindowSystem.quit(&self)
 {
 	sdl::quit();
 	self.windows.free();
