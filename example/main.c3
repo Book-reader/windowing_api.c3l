@@ -16,14 +16,28 @@ fn void main()
 	defer wapi::destroy_window(w);
 	wapi::set_fps(w, 60);
 
-	usz i = 255;
-	while (i--)
+	char i = 255;
+	uint x = 0;
+	uint y = 0;
+	while MAIN: (true)
 	{
-		// Event e = w.get_event();
+		x++;
+		y++;
+		defer i--;
+		// TODO: some way to wait for an event forever? ig I could check for time::FOREVER
+		while (try e = wapi::get_event(w)) switch (e.type)
+		{
+			case QUIT:
+				break MAIN;
+			case KEY_DOWN:
+				log::info("got key %s", e.key);
+				if (e.key == ESC) break MAIN;
+			default:
+		}
 		wapi::@drawing(w; float delta)
 		{
-			wapi::clear(w, {(char)i, (char)i, (char)i, 255});
-//			wapi::d
+			wapi::clear(w, {(char)i, 0, 255 - (char)i, 255});
+			wapi::draw_rectangle(w, x, y, 20, 20, {0, 0, 0, 255});
 		};
 	}
 	wapi::destroy_window(w);
