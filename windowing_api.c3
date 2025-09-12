@@ -234,8 +234,11 @@ fn void SDLWindowSystem.quit(&self)
 	self.windows.free();
 	self.used_windows.free();
 }
-<* @require self.used_windows[(usz)window] *>
-fn SDLWindowSystemWindow* SDLWindowSystem.get(&self, Window window) => &self.windows[(usz)window];
+<*
+ @require (usz)window != 0
+ @require self.used_windows[(usz)window - 1]
+*>
+fn SDLWindowSystemWindow* SDLWindowSystem.get(&self, Window window) => &self.windows[(usz)window - 1];
 
 fn bool SDLWindowSystem.supports_multiple_windows(&self) @dynamic => true;
 fn PropVal SDLWindowSystem.get_prop(&self, Window window, Prop p) @dynamic => abort();
@@ -246,7 +249,8 @@ fn void SDLWindowSystem.set_prop(&self, Window window, Prop p, PropVal v) @dynam
 		case FRAME_DELAY:
 			self.get(window).delay_ms = (int)v.as_float();
 		case PARENT_WINDOW:
-			sdl::setWindowModalFor(self.get(window).window, self.get(v.as_window()).window);
+			// TODO: some form of error handling
+			sdl::setWindowModalFor(self.get(window).window, (usz)window == 0 ? null : self.get(v.as_window()).window);
 			break;
 		default:
 			abort("%s", p);
@@ -283,14 +287,15 @@ fn Window? SDLWindowSystem.create_window(&self, uint width, uint height, String 
 		self.windows.push(w);
 		self.used_windows.push(true);
 	}
-	return (Window)idx;
+	return (Window)(idx + 1);
 }
-<* @require self.used_windows[(usz)window] *>
+
+<* @require self.used_windows[(usz)window - 1] *>
 fn void SDLWindowSystem.destroy_window(&self, Window window) @dynamic
 {
 	sdl::destroyRenderer(self.get(window).renderer);
 	sdl::destroyWindow(self.get(window).window);
-	self.used_windows[(usz)window] = false;
+	self.used_windows[(usz)window - 1] = false;
 }
 
 fn void SDLWindowSystem.clear(&self, Window window, Colour colour) @dynamic
