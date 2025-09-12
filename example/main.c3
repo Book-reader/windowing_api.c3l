@@ -8,6 +8,8 @@ alias wapi = module windowing_api;
 
 fn void main()
 {
+	SDLWindowSystem sdl;
+	wapi::set_window_system(&sdl);
 	Window w = wapi::create_window(800, 600, "Hello from C3!")!!;
 	wapi::set_fps(w, 60);
 
@@ -18,6 +20,7 @@ fn void main()
 		wapi::@drawing(w; float delta)
 		{
 			wapi::clear(w, {(char)i, (char)i, (char)i, 255});
+//			wapi::d
 		};
 	}
 	wapi::destroy_window(w);
