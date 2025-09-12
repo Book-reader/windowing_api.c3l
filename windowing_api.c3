@@ -25,7 +25,9 @@ interface WindowSystem
 	fn void end_draw(Window window) @optional;
 	fn void clear(Window window, Colour colour) @optional;
 	fn void draw_rectangle(Window window, int x, int y, int width, int height, Colour colour, bool fill = true);
+	// Could these be properties instead? they seem less like window properties and more like system properties though, so if there's enough of them then there could be a `get_system_prop` method
 	fn bool supports_multiple_windows();
+	fn bool supports_fullscreen();
 }
 
 typedef Window = void*;
@@ -115,6 +117,7 @@ enum Prop
 {
 	HIDDEN,
 	MAXIMISED,
+	FULLSCREEN,
 	WIDTH,
 	HEIGHT,
 	TITLE,
@@ -154,6 +157,10 @@ fn float PropVal.as_float(&self) => self.float_;
  @require self.type == WINDOW
 *>
 fn Window PropVal.as_window(&self) => self.window;
+<*
+ @require self.type == FLAG
+*>
+fn bool PropVal.as_flag(&self) => self.flag;
 
 fn void set_window_system(WindowSystem window_system)
 {
@@ -202,6 +209,9 @@ fn void draw_rectangle(Window window, uint x, uint y, uint width, uint height, C
 
 fn void set_parent(Window child, Window parent) => current_window_system.set_prop(child, PARENT_WINDOW, {.type = WINDOW, .window = parent});
 
+fn void set_fullscreen(Window window, bool fullscreen) => current_window_system.set_prop(window, FULLSCREEN, {.type = FLAG, .flag = fullscreen});
+fn void set_maximised(Window window, bool fullscreen) => current_window_system.set_prop(window, MAXIMISED, {.type = FLAG, .flag = fullscreen});
+
 // SDL implementation
 module windowing_api @if(env::LINUX || $feature(WINDOWING_SDL));
 import sdl;
@@ -241,6 +251,7 @@ fn void SDLWindowSystem.quit(&self)
 fn SDLWindowSystemWindow* SDLWindowSystem.get(&self, Window window) => &self.windows[(usz)window - 1];
 
 fn bool SDLWindowSystem.supports_multiple_windows(&self) @dynamic => true;
+fn bool SDLWindowSystem.supports_fullscreen(&self) @dynamic => true;
 fn PropVal SDLWindowSystem.get_prop(&self, Window window, Prop p) @dynamic => abort();
 fn void SDLWindowSystem.set_prop(&self, Window window, Prop p, PropVal v) @dynamic
 {
@@ -252,6 +263,10 @@ fn void SDLWindowSystem.set_prop(&self, Window window, Prop p, PropVal v) @dynam
 			// TODO: some form of error handling
 			sdl::setWindowModalFor(self.get(window).window, (usz)window == 0 ? null : self.get(v.as_window()).window);
 			break;
+		case FULLSCREEN:
+			sdl::setWindowFullscreen(self.get(window).window, v.as_flag() ? (uint)sdl::WINDOW_FULLSCREEN : 0);
+		case MAXIMISED:
+			sdl::setWindowFullscreen(self.get(window).window, v.as_flag() ? (uint)sdl::WINDOW_FULLSCREEN_DESKTOP : 0);
 		default:
 			abort("%s", p);
 	}

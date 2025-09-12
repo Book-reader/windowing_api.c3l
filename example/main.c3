@@ -38,6 +38,8 @@ fn void main()
 			case KEY_DOWN:
 				log::info("got key %s", e.key);
 				if (e.key == ESC) log::info("press escape over the child window to quit");
+				if (e.key == F) wapi::set_maximised(w, true);
+				if (e.key == G) wapi::set_maximised(w, false);
 			default:
 		}
 		wapi::@drawing(w; float delta)
