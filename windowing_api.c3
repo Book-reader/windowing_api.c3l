@@ -25,6 +25,7 @@ interface WindowSystem
 	fn void end_draw(Window window) @optional;
 	fn void clear(Window window, Colour colour) @optional;
 	fn void draw_rectangle(Window window, int x, int y, int width, int height, Colour colour, bool fill = true);
+	fn bool supports_multiple_windows();
 }
 
 typedef Window = void*;
@@ -118,6 +119,7 @@ enum Prop
 	HEIGHT,
 	TITLE,
 	FRAME_DELAY,
+	PARENT_WINDOW,
 }
 enum PropType : char
 {
@@ -125,17 +127,19 @@ enum PropType : char
 	FLOAT,
 	INT,
 	STRING,
+	WINDOW,
 }
 struct PropVal
 {
-	PropType type;
 	union
 	{
 		bool flag;
 		float float_;
 		int int_;
 		String string;
+		Window window;
 	}
+	PropType type;
 }
 
 <*
@@ -146,6 +150,10 @@ fn int PropVal.as_int(&self) => self.int_;
  @require self.type == FLOAT
 *>
 fn float PropVal.as_float(&self) => self.float_;
+<*
+ @require self.type == WINDOW
+*>
+fn Window PropVal.as_window(&self) => self.window;
 
 fn void set_window_system(WindowSystem window_system)
 {
@@ -192,6 +200,8 @@ fn void draw_rectangle(Window window, uint x, uint y, uint width, uint height, C
 	current_window_system.draw_rectangle(window, x, y, width, height, colour);
 }
 
+fn void set_parent(Window child, Window parent) => current_window_system.set_prop(child, PARENT_WINDOW, {.type = WINDOW, .window = parent});
+
 // SDL implementation
 module windowing_api @if(env::LINUX || $feature(WINDOWING_SDL));
 import sdl;
@@ -224,14 +234,20 @@ fn void SDLWindowSystem.quit(&self)
 	self.windows.free();
 	self.used_windows.free();
 }
+<* @require self.used_windows[(usz)window] *>
+fn SDLWindowSystemWindow* SDLWindowSystem.get(&self, Window window) => &self.windows[(usz)window];
 
+fn bool SDLWindowSystem.supports_multiple_windows(&self) @dynamic => true;
 fn PropVal SDLWindowSystem.get_prop(&self, Window window, Prop p) @dynamic => abort();
 fn void SDLWindowSystem.set_prop(&self, Window window, Prop p, PropVal v) @dynamic
 {
 	switch (p)
 	{
 		case FRAME_DELAY:
-			self.windows[(usz)window].delay_ms = (int)v.as_float();
+			self.get(window).delay_ms = (int)v.as_float();
+		case PARENT_WINDOW:
+			sdl::setWindowModalFor(self.get(window).window, self.get(v.as_window()).window);
+			break;
 		default:
 			abort("%s", p);
 	}
@@ -269,29 +285,30 @@ fn Window? SDLWindowSystem.create_window(&self, uint width, uint height, String 
 	}
 	return (Window)idx;
 }
+<* @require self.used_windows[(usz)window] *>
 fn void SDLWindowSystem.destroy_window(&self, Window window) @dynamic
 {
-	sdl::destroyRenderer(self.windows[(usz)window].renderer);
-	sdl::destroyWindow(self.windows[(usz)window].window);
+	sdl::destroyRenderer(self.get(window).renderer);
+	sdl::destroyWindow(self.get(window).window);
 	self.used_windows[(usz)window] = false;
 }
 
 fn void SDLWindowSystem.clear(&self, Window window, Colour colour) @dynamic
 {
-	sdl::setRenderDrawColor(self.windows[(usz)window].renderer, ...colour);
-	sdl::renderClear(self.windows[(usz)window].renderer);
+	sdl::setRenderDrawColor(self.get(window).renderer, ...colour);
+	sdl::renderClear(self.get(window).renderer);
 }
 
 fn void SDLWindowSystem.draw_rectangle(&self, Window window, int x, int y, int width, int height, Colour colour, bool fill = true) @dynamic
 {
-	sdl::setRenderDrawColor(self.windows[(usz)window].renderer, ...colour);
+	sdl::setRenderDrawColor(self.get(window).renderer, ...colour);
 	if (fill)
 	{
-		sdl::renderFillRect(self.windows[(usz)window].renderer, &&{x, y, width, height});
+		sdl::renderFillRect(self.get(window).renderer, &&{x, y, width, height});
 	}
 	else
 	{
-		sdl::renderDrawRect(self.windows[(usz)window].renderer, &&{x, y, width, height});
+		sdl::renderDrawRect(self.get(window).renderer, &&{x, y, width, height});
 	}
 }
 
@@ -313,7 +330,14 @@ fn Event? SDLWindowSystem.get_event(&self, Window window, Duration timeout = tim
 			return {.type = QUIT};
 		case sdl::KEYDOWN:
 			// TODO: also handle modifiers in a bitstruct
-			return {.type = KEY_DOWN, .key = SDL_KEYCODE_LOOKUP[(int)e.key.keysym.scancode]};
+			if (e.key.windowid == sdl::getWindowID(self.get(window).window))
+			{
+				return {.type = KEY_DOWN, .key = SDL_KEYCODE_LOOKUP[(int)e.key.keysym.scancode]};
+			}
+			else
+			{
+				sdl::pushEvent(&e);
+			}
 		default:
 			// TODO
 	}
@@ -322,8 +346,8 @@ fn Event? SDLWindowSystem.get_event(&self, Window window, Duration timeout = tim
 
 fn void SDLWindowSystem.end_draw(&self, Window window) @dynamic
 {
-	sdl::renderPresent(self.windows[(usz)window].renderer);
-	sdl::delay(self.windows[(usz)window].delay_ms);
+	sdl::renderPresent(self.get(window).renderer);
+	sdl::delay(self.get(window).delay_ms);
 }
 
 const KeyCode[(int)sdl::NUM_SCANCODES] SDL_KEYCODE_LOOKUP @private = {
