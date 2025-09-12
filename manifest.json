@@ -1,0 +1,24 @@
+{
+	"provides": "windowing_api",
+	"linklib-dir": "linked-libs",
+	"targets": {
+		"android-aarch64": {},
+		"freebsd-x64": {},
+		"linux-aarch64": {},
+		"linux-riscv32": {},
+		"linux-riscv64": {},
+		"linux-x86": {},
+		"linux-x64": {
+			// "dependencies": [ "opengl", "glfw" ],
+			"dependencies": [ "sdl2" ],
+		},
+		"macos-aarch64": {},
+		"macos-x64": {},
+		"netbsd-x64": {},
+		"openbsd-x64": {},
+		"wasm32": {},
+		"wasm64": {},
+		"windows-aarch64": {},
+		"windows-x64": {},
+	}
+}
