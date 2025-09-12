@@ -19,15 +19,13 @@ interface WindowSystem
 	fn Window? create_window(uint width, uint height, String title);
 	fn void destroy_window(Window window);
 	fn Event? get_event(Window window, Duration timeout = time::sec(0));
-	fn PropVal get_prop(Window window, Prop t);
-	fn void set_prop(Window window, Prop t, PropVal p);
+	fn PropVal get_window_prop(Window window, Prop t);
+	fn void set_window_prop(Window window, Prop t, PropVal p);
 	fn void start_draw(Window window) @optional;
 	fn void end_draw(Window window) @optional;
 	fn void clear(Window window, Colour colour) @optional;
 	fn void draw_rectangle(Window window, int x, int y, int width, int height, Colour colour, bool fill = true);
-	// Could these be properties instead? they seem less like window properties and more like system properties though, so if there's enough of them then there could be a `get_system_prop` method
-	fn bool supports_multiple_windows();
-	fn bool supports_fullscreen();
+	fn PropVal get_system_prop(SystemProp p);
 }
 
 typedef Window = void*;
@@ -123,6 +121,13 @@ enum Prop
 	TITLE,
 	FRAME_DELAY,
 	PARENT_WINDOW,
+	SCREEN_WIDTH,
+	SCREEN_HEIGHT,
+}
+enum SystemProp
+{
+	SUPPORTS_FULLSCREEN,
+	SUPPORTS_MULTIPLE_WINDOWS,
 }
 enum PropType : char
 {
@@ -192,13 +197,13 @@ fn void clear(Window window, Colour colour)
 	}
 	else
 	{
-		current_window_system.draw_rectangle(window, 0, 0, current_window_system.get_prop(window, WIDTH).as_int(), current_window_system.get_prop(window, HEIGHT).as_int(), colour);
+		current_window_system.draw_rectangle(window, 0, 0, current_window_system.get_window_prop(window, WIDTH).as_int(), current_window_system.get_window_prop(window, HEIGHT).as_int(), colour);
 	}
 }
 
 fn void set_fps(Window window, uint fps)
 {
-	current_window_system.set_prop(window, FRAME_DELAY, {.type = FLOAT, .float_ = (float)(fps != 0 ? (1000.0 / fps) : 0.0)});
+	current_window_system.set_window_prop(window, FRAME_DELAY, {.type = FLOAT, .float_ = (float)(fps != 0 ? (1000.0 / fps) : 0.0)});
 }
 
 fn Event? get_event(Window window, Duration timeout = time::sec(0)) => current_window_system.get_event(window, timeout);
@@ -207,10 +212,11 @@ fn void draw_rectangle(Window window, uint x, uint y, uint width, uint height, C
 	current_window_system.draw_rectangle(window, x, y, width, height, colour);
 }
 
-fn void set_parent(Window child, Window parent) => current_window_system.set_prop(child, PARENT_WINDOW, {.type = WINDOW, .window = parent});
+fn void set_parent(Window child, Window parent) => current_window_system.set_window_prop(child, PARENT_WINDOW, {.type = WINDOW, .window = parent});
 
-fn void set_fullscreen(Window window, bool fullscreen) => current_window_system.set_prop(window, FULLSCREEN, {.type = FLAG, .flag = fullscreen});
-fn void set_maximised(Window window, bool fullscreen) => current_window_system.set_prop(window, MAXIMISED, {.type = FLAG, .flag = fullscreen});
+fn void set_fullscreen(Window window, bool fullscreen) => current_window_system.set_window_prop(window, FULLSCREEN, {.type = FLAG, .flag = fullscreen});
+fn void set_maximised(Window window, bool fullscreen) => current_window_system.set_window_prop(window, MAXIMISED, {.type = FLAG, .flag = fullscreen});
+fn int[<2>] get_display_size(Window window) => {current_window_system.get_window_prop(window, SCREEN_WIDTH).as_int(), current_window_system.get_window_prop(window, SCREEN_HEIGHT).as_int()};
 
 // SDL implementation
 module windowing_api @if(env::LINUX || $feature(WINDOWING_SDL));
@@ -250,23 +256,44 @@ fn void SDLWindowSystem.quit(&self)
 *>
 fn SDLWindowSystemWindow* SDLWindowSystem.get(&self, Window window) => &self.windows[(usz)window - 1];
 
-fn bool SDLWindowSystem.supports_multiple_windows(&self) @dynamic => true;
-fn bool SDLWindowSystem.supports_fullscreen(&self) @dynamic => true;
-fn PropVal SDLWindowSystem.get_prop(&self, Window window, Prop p) @dynamic => abort();
-fn void SDLWindowSystem.set_prop(&self, Window window, Prop p, PropVal v) @dynamic
+fn PropVal SDLWindowSystem.get_window_prop(&self, Window window, Prop p) @dynamic
+{
+	switch (p)
+	{
+		case SCREEN_WIDTH:
+		case SCREEN_HEIGHT:
+			sdl::DisplayMode m;
+			if (sdl::getCurrentDisplayMode(sdl::getWindowDisplayIndex(self.get(window).window), &m) < 0) abort();
+			return {.type = INT, .int_ = p == SCREEN_WIDTH ? m.w : m.h};
+		default:
+			abort("%s", p);
+	}
+}
+
+fn PropVal SDLWindowSystem.get_system_prop(&self, SystemProp p) @dynamic
+{
+	switch (p)
+	{
+		case SUPPORTS_FULLSCREEN:
+		case SUPPORTS_MULTIPLE_WINDOWS:
+			return {.type = FLAG, .flag = true};
+
+	}
+}
+
+fn void SDLWindowSystem.set_window_prop(&self, Window window, Prop p, PropVal v) @dynamic
 {
 	switch (p)
 	{
 		case FRAME_DELAY:
 			self.get(window).delay_ms = (int)v.as_float();
 		case PARENT_WINDOW:
-			// TODO: some form of error handling
-			sdl::setWindowModalFor(self.get(window).window, (usz)window == 0 ? null : self.get(v.as_window()).window);
-			break;
+			// TODO: proper error handling
+			if (sdl::setWindowModalFor(self.get(window).window, (usz)window == 0 ? null : self.get(v.as_window()).window) < 0) abort();
 		case FULLSCREEN:
-			sdl::setWindowFullscreen(self.get(window).window, v.as_flag() ? (uint)sdl::WINDOW_FULLSCREEN : 0);
+			if (sdl::setWindowFullscreen(self.get(window).window, v.as_flag() ? (uint)sdl::WINDOW_FULLSCREEN : 0) < 0) abort();
 		case MAXIMISED:
-			sdl::setWindowFullscreen(self.get(window).window, v.as_flag() ? (uint)sdl::WINDOW_FULLSCREEN_DESKTOP : 0);
+			if (sdl::setWindowFullscreen(self.get(window).window, v.as_flag() ? (uint)sdl::WINDOW_FULLSCREEN_DESKTOP : 0) < 0) abort();
 		default:
 			abort("%s", p);
 	}

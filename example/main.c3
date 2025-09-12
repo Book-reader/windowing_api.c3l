@@ -22,6 +22,8 @@ fn void main()
 	// wapi::set_fps(child, 60);
 	wapi::set_parent(child, w);
 
+	log::info("display size: %s", wapi::get_display_size(w));
+
 	char i = 255;
 	uint x = 0;
 	uint y = 0;
