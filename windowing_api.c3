@@ -26,6 +26,7 @@ interface WindowSystem
 	fn void clear(Window window, Colour colour) @optional;
 	fn void draw_rectangle(Window window, int x, int y, int width, int height, Colour colour, bool fill = true);
 	fn PropVal get_system_prop(SystemProp p);
+	fn any get_native_handle(Window window);
 }
 
 typedef Window = void*;
@@ -254,8 +255,9 @@ fn void SDLWindowSystem.quit(&self)
  @require (usz)window != 0
  @require self.used_windows[(usz)window - 1]
 *>
-fn SDLWindowSystemWindow* SDLWindowSystem.get(&self, Window window) => &self.windows[(usz)window - 1];
+macro SDLWindowSystemWindow* SDLWindowSystem.get(&self, Window window) => &self.windows[(usz)window - 1];
 
+fn any SDLWindowSystem.get_native_handle(&self, Window window) @dynamic => self.get(window);
 fn PropVal SDLWindowSystem.get_window_prop(&self, Window window, Prop p) @dynamic
 {
 	switch (p)

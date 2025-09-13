@@ -16,22 +16,23 @@ fn void main()
 	defer wapi::destroy_window(w);
 	wapi::set_fps(w, 60);
 
-	Window child = wapi::create_window(200, 100, "Child Window")!!;
+	/*Window child = wapi::create_window(200, 100, "Child Window")!!;
 	defer wapi::destroy_window(child);
 	// the delay from this FPS limit adds on to the delay from the other FPS. multiple windows should probably be either put on separate threads or there could be a global FPS as an option instead.
 	// wapi::set_fps(child, 60);
-	wapi::set_parent(child, w);
+	wapi::set_parent(child, w);*/
 
 	log::info("display size: %s", wapi::get_display_size(w));
 
 	char i = 255;
+	ichar diff = -1;
 	uint x = 0;
 	uint y = 0;
 	while MAIN: (true)
 	{
 		x++;
 		y++;
-		defer i--;
+		if ((i += diff) == char.min || i == char.max) diff = -diff;
 		// TODO: some way to wait for an event forever? ig I could check for time::FOREVER
 		while (try e = wapi::get_event(w)) switch (e.type)
 		{
@@ -39,7 +40,7 @@ fn void main()
 				break MAIN;
 			case KEY_DOWN:
 				log::info("got key %s", e.key);
-				if (e.key == ESC) log::info("press escape over the child window to quit");
+				if (e.key == ESC || e.key == Q) break MAIN;// log::info("press escape over the child window to quit");
 				if (e.key == F) wapi::set_maximised(w, true);
 				if (e.key == G) wapi::set_maximised(w, false);
 			default:
@@ -50,7 +51,7 @@ fn void main()
 			wapi::draw_rectangle(w, x, y, 20, 20, {0, 0, 0, 255});
 		};
 
-		while (try e = wapi::get_event(child)) switch (e.type)
+/*		while (try e = wapi::get_event(child)) switch (e.type)
 		{
 			case KEY_DOWN:
 				log::info("child got key %s", e.key);
@@ -61,7 +62,7 @@ fn void main()
 		wapi::@drawing(child; float delta)
 		{
 			wapi::clear(child, {0, 0, 0, 255});
-		};
+		};*/
 	}
 }
 
