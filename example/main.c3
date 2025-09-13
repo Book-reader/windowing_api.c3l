@@ -12,7 +12,8 @@ fn void main()
 	sdl.init(mem)!!;
 	defer sdl.quit();
 	wapi::set_window_system(&sdl);
-	Window w = wapi::create_window(800, 600, "Hello from C3!")!!;
+	// TODO: allow resizing window (and maybe have optional flags that can be set at create_window)
+	Window w = wapi::create_window(800, 600, "Hello from C3!", {.resizable})!!;
 	defer wapi::destroy_window(w);
 	wapi::set_fps(w, 60);
 
@@ -41,8 +42,8 @@ fn void main()
 			case KEY_DOWN:
 				log::info("got key %s", e.key);
 				if (e.key == ESC || e.key == Q) break MAIN;// log::info("press escape over the child window to quit");
-				if (e.key == F) wapi::set_maximised(w, true);
-				if (e.key == G) wapi::set_maximised(w, false);
+				if (e.key == F) wapi::set_maximised(w, true)!!;
+				if (e.key == G) wapi::set_maximised(w, false)!!;
 			default:
 		}
 		wapi::@drawing(w; float delta)
